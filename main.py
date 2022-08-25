@@ -3,4 +3,4 @@ from youtubeLinkScrapper import youtubeLinkScrapper
 
 getPlaylistDataFromSpotify('37i9dQZF1DX76Wlfdnj7AP')
 
-youtubeLinkScrapper('37i9dQZF1DX76Wlfdnj7AP')
+youtubeLinkScrazpper('37i9dQZF1DX76Wlfdnj7AP')
