@@ -21,9 +21,10 @@ def scrape_song(songObject):
     time.sleep(5)
     first_vid_box = browser.find_elements(By.TAG_NAME, "ytd-video-renderer")[0] # Get the first video section
     first_vid_box_link = first_vid_box.find_elements(By.TAG_NAME, "a")[0].get_attribute('href') #Get_first_Inker_Tag_href_value
-    print(colored(first_vid_box_link, 'red'))
+    print(colored(first_vid_box_link, 'yellow'))
     # Download Now
     download_vid_with_pytube(first_vid_box_link)
+    print(colored(song_name + " OK", 'green'))
 
 data = []
 # Output to excel

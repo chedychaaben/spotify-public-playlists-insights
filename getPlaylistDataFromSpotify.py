@@ -6,9 +6,10 @@ from selenium.webdriver.common.by import By
 
 
 def scrape_song(song, data):
+    second_comuln = song.find_element(By.CLASS_NAME, 'iCQtmPqY0QvkumAOuCjr')
     songId      = song.find_element(By.CLASS_NAME, 'VpYFchIiPg3tPhBGyynT').get_attribute('innerText')
-    songTitle   = song.find_element(By.CLASS_NAME, 'iCQtmPqY0QvkumAOuCjr').find_element(By.TAG_NAME, 'a').get_attribute('innerText')
-    songArtist  = song.find_element(By.CLASS_NAME, 'iCQtmPqY0QvkumAOuCjr').find_element(By.TAG_NAME, 'span').get_attribute('innerText')
+    songTitle   = second_comuln.find_element(By.TAG_NAME, 'a').get_attribute('innerText')
+    songArtist  = second_comuln.find_elements(By.TAG_NAME, 'span')[len(second_comuln.find_elements(By.TAG_NAME, 'span'))-1].get_attribute('innerText')
     
     songDict = {
                 'id': songId,
