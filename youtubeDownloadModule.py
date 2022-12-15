@@ -18,14 +18,12 @@ def download_vid_with_youtube_ld(video_url):
 
     print("Download complete... {}".format(filename))
 
-def download_vid_with_pytube(video_url):
+def download_vid_with_pytube(video_url, folder_name):
     yt = pt.YouTube(video_url)
-    t = yt.streams.filter(only_audio=True)
-    
-    # download the file
-    out_file = t[0].download()
 
-    # save the file as mp3
-    base, ext = os.path.splitext(out_file)
-    new_file = base + '.mp3'
-    os.rename(out_file, new_file)
+    out_file = yt.streams.filter(abr="160kbps", progressive=False).first()#get_audio_only()
+    
+    filename_to_make = "".join(i for i in out_file.title if i not in "\/:*?<>|") #+ ".mp3"
+
+    created_file = out_file.download(output_path = os.getcwd() + '\\' + folder_name, filename=filename_to_make)
+    # Converting the webm to mp3
