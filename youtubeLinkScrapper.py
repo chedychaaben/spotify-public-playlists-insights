@@ -1,42 +1,53 @@
-import time, json
+import time
+import json
 from termcolor import colored
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from youtubeDownloadModule import download_vid_with_pytube
 
-#Chrome Driver loading ...
-chrome_options = webdriver.ChromeOptions()
-chrome_options.add_argument("--headless")
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
+def init_browser():
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    service = Service(ChromeDriverManager().install())
+    browser = webdriver.Chrome(service=service, options=chrome_options)
+    browser.maximize_window()
+    return browser
 
-browser = webdriver.Chrome(executable_path=f'chromedriver.exe' ,chrome_options=chrome_options)
-browser.maximize_window()
+def scrape_song(song_object, folder_name, browser):
+    try:
+        song_name = f"{song_object['title']} {song_object['artist']}"
+        song_search_url = f'https://www.youtube.com/results?search_query={song_name}'
+        browser.get(song_search_url)
+        time.sleep(3)
+        videos = browser.find_elements(By.TAG_NAME, "ytd-video-renderer")
+        if not videos:
+            print(colored(f"No videos found for {song_name}", "red"))
+            return
+        first_vid_link = videos[0].find_elements(By.TAG_NAME, "a")[0].get_attribute('href')
+        print(colored(first_vid_link, 'yellow'))
+        download_vid_with_pytube(first_vid_link, folder_name)
+        print(colored(f"{song_name} OK", 'green'))
+    except Exception as e:
+        print(colored(f"Error scraping {song_name}: {e}", "red"))
 
-def scrape_song(songObject, folder_name):
-    # Example of entered songObject = {'id': songId,'title' : songTitle, 'artist': songArtist}
-    song_name = songObject['title'] + " " + songObject['artist']
-    song_search_url = f'https://www.youtube.com/results?search_query={song_name}'
-    browser.get(song_search_url)
-    time.sleep(5)
-    first_vid_box = browser.find_elements(By.TAG_NAME, "ytd-video-renderer")[0] # Get the first video section
-    first_vid_box_link = first_vid_box.find_elements(By.TAG_NAME, "a")[0].get_attribute('href') #Get_first_Inker_Tag_href_value
-    print(colored(first_vid_box_link, 'yellow'))
-    # Download Now
-    download_vid_with_pytube(first_vid_box_link, folder_name)
-    print(colored(song_name + " OK", 'green'))
-
-data = []
-# Output to excel
 def load_json_data(file_name):
-    global data
-    with open(file_name, 'r', encoding='UTF8') as f:
-        data = json.load(f)
-    print(colored("JSON Data Loaded Successfully","red"))
+    try:
+        with open(file_name, 'r', encoding='UTF8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(colored(f"Error loading JSON: {e}", "red"))
+        raise
 
-
-def youtubeLinkScrapper(playlist_id : str):
-    load_json_data(f'playlist-{playlist_id}.json')
-    folder_name = "Playlist " + playlist_id
-    for songObject in data:
-        scrape_song(songObject, folder_name)
+def youtubeLinkScrapper(playlist_id: str):
+    data = load_json_data(f'playlist-{playlist_id}.json')
+    folder_name = f"Playlist_{playlist_id}"
+    browser = init_browser()
+    try:
+        for song_object in data:
+            scrape_song(song_object, folder_name, browser)
+    finally:
+        browser.quit()
+    print(colored("Scraping and downloading completed", "green"))

@@ -1,51 +1,31 @@
-# Convert webm files to mp3 using FFMPEG
-# To use this script you need to install FFMPEG in your system
-# For windows users, you need to download & add FFMPEG to the PATH (Windows Environment Variables)
-#  py WebmToMp3.py --webm_path "C://Users/LENOVO/Documents/GitHub/Scraping Spotify Playlists/test"
 import os
-import re
 import subprocess
 import argparse
 import sys
 
-# The parser
-parser = argparse.ArgumentParser(description='Convert webm files of a specific directory to mp3 using ffmpeg.')
+def convert_to_mp3(webm_path, mp3_path=None):
+    if not os.path.isdir(webm_path):
+        print(f'The input path "{webm_path}" does not exist.')
+        sys.exit(1)
+    if mp3_path is None:
+        mp3_path = webm_path
+    os.makedirs(mp3_path, exist_ok=True)
+    for file in os.listdir(webm_path):
+        if file.endswith(('.webm', '.mp4')):
+            input_file = os.path.join(webm_path, file)
+            output_file = os.path.join(mp3_path, os.path.splitext(file)[0] + '.mp3')
+            command = [
+                'ffmpeg', '-i', input_file, '-vn', '-ab', '128k', '-ar', '44100', '-y', output_file
+            ]
+            try:
+                subprocess.run(command, check=True, shell=False)
+                print(f"Converted {file} to MP3")
+            except subprocess.CalledProcessError as e:
+                print(f"Error converting {file}: {e}")
 
-# The arguments
-parser.add_argument('--webm_path',
-                    #    metavar='webm_path',
-                    action='store',
-                       type=str,
-                       required=True,
-                       help='The path of webm files')
-
-parser.add_argument('--mp3_path',
-                    #    metavar='mp3_path',
-                        action='store',
-                       type=str,
-                       required=False,
-                       help='The path of mp3 files',
-                    #    default=None,
-                    )
-
-args = parser.parse_args()
-# input_path = args.Path
-
-if not os.path.isdir(args.webm_path):
-    print(f'The webm path "{args.webm_path}" does not exist.')
-    sys.exit()
-
-if args.mp3_path == None:
-    args.mp3_path = args.webm_path
-
-elif not os.path.isdir(args.mp3_path):
-    os.makedirs(args.mp3_path)
-
-
-for file in os.listdir(args.webm_path):
-    webmFile = os.path.join(args.webm_path, file)
-    mp3File = os.path.join(args.mp3_path, file).replace(
-        "webm", "mp3")
-
-    command = f"ffmpeg -i \"{webmFile}\" -vn -ab 128k -ar 44100 -y \"{mp3File}\""
-    subprocess.call(command, shell=True)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Convert audio files to MP3 using ffmpeg.')
+    parser.add_argument('--webm_path', type=str, required=True, help='Path to input audio files')
+    parser.add_argument('--mp3_path', type=str, help='Path for MP3 output files')
+    args = parser.parse_args()
+    convert_to_mp3(args.webm_path, args.mp3_path)

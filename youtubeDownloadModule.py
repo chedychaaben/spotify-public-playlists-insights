@@ -1,29 +1,43 @@
 import os
-import youtube_dl
+import yt_dlp
 import pytube as pt
 
-def download_vid_with_youtube_ld(video_url):
-    video_info = youtube_dl.YoutubeDL().extract_info(
-        url = video_url,download=False
-    )
-    filename = f"{video_info['title']}.mp3"
-    options={
-        'format':'bestaudio/best',
-        'keepvideo':False,
-        'outtmpl':filename,
-    }
-
-    with youtube_dl.YoutubeDL(options) as ydl:
-        ydl.download([video_info['webpage_url']])
-
-    print("Download complete... {}".format(filename))
+def download_vid_with_yt_dlp(video_url, folder_name):
+    try:
+        video_info = yt_dlp.YoutubeDL().extract_info(url=video_url, download=False)
+        filename = f"{video_info['title']}.mp3"
+        output_path = os.path.join(os.getcwd(), folder_name)
+        os.makedirs(output_path, exist_ok=True)
+        options = {
+            'format': 'bestaudio/best',
+            'outtmpl': os.path.join(output_path, filename),
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+        }
+        with yt_dlp.YoutubeDL(options) as ydl:
+            ydl.download([video_url])
+        print(f"Download complete: {filename}")
+        return os.path.join(output_path, filename)
+    except Exception as e:
+        print(f"Error downloading with yt_dlp: {e}")
+        return None
 
 def download_vid_with_pytube(video_url, folder_name):
-    yt = pt.YouTube(video_url)
-
-    out_file = yt.streams.filter(abr="160kbps", progressive=False).first()#get_audio_only()
-    
-    filename_to_make = "".join(i for i in out_file.title if i not in "\/:*?<>|") #+ ".mp3"
-
-    created_file = out_file.download(output_path = os.getcwd() + '\\' + folder_name, filename=filename_to_make)
-    # Converting the webm to mp3
+    try:
+        yt = pt.YouTube(video_url)
+        stream = yt.streams.filter(only_audio=True, abr="160kbps").first() or \
+                 yt.streams.filter(only_audio=True).first()
+        if not stream:
+            raise ValueError("No suitable audio stream found")
+        safe_title = "".join(c for c in yt.title if c not in r'\/:*?<>|')
+        output_path = os.path.join(os.getcwd(), folder_name)
+        os.makedirs(output_path, exist_ok=True)
+        created_file = stream.download(output_path=output_path, filename=safe_title)
+        print(f"Download complete: {created_file}")
+        return created_file
+    except Exception as e:
+        print(f"Error downloading with pytube: {e}")
+        return None

@@ -1,0 +1,5 @@
+yt-dlp
+pytube
+selenium
+termcolor
+webdriver-manager

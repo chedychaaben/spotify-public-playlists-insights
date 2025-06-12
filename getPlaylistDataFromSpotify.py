@@ -1,79 +1,85 @@
-import time, json
+import time
+import json
 from termcolor import colored
 from selenium import webdriver
-from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
-
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.action_chains import ActionChains
+from webdriver_manager.chrome import ChromeDriverManager
 
 def scrape_song(song, data):
-    second_comuln = song.find_element(By.CLASS_NAME, 'iCQtmPqY0QvkumAOuCjr')
-    songId      = song.find_element(By.CLASS_NAME, 'VpYFchIiPg3tPhBGyynT').get_attribute('innerText')
-    songTitle   = second_comuln.find_element(By.TAG_NAME, 'a').get_attribute('innerText')
-    songArtist  = second_comuln.find_elements(By.TAG_NAME, 'span')[len(second_comuln.find_elements(By.TAG_NAME, 'span'))-1].get_attribute('innerText')
-    
-    songDict = {
-                'id': songId,
-                'title' : songTitle, 
-                'artist': songArtist
-            }
-    if songDict not in data:
-        data.append(songDict)
-        print(colored(f'Scraped Song: -{songId}- {songTitle} - {songArtist}', 'yellow'))
+    try:
+        song_id = song.find_element(By.CSS_SELECTOR, "div[data-testid='track-row'] div[data-testid='tracklist-row__track-id']").text
+        title_elem = song.find_element(By.CSS_SELECTOR, "div[data-testid='tracklist-row__track-info'] a")
+        song_title = title_elem.text
+        artist_elem = song.find_element(By.CSS_SELECTOR, "div[data-testid='tracklist-row__track-info'] span:last-child")
+        song_artist = artist_elem.text
+        song_dict = {'id': song_id, 'title': song_title, 'artist': song_artist}
+        if song_dict not in data:
+            data.append(song_dict)
+            print(colored(f"Scraped Song: -{song_id}- {song_title} - {song_artist}", 'yellow'))
+    except Exception as e:
+        print(colored(f"Error scraping song: {e}", "red"))
 
-def scroll_to_element(songsWebElement, element_id,browser):
-    print(colored( f'Scrolling To Index of Last Loaded song : {element_id}', 'green'))
-    ActionChains(browser)\
-        .scroll_to_element(songsWebElement[element_id-1])\
-        .perform()
-    #It returns the id of the last availble song
-    lastLoadedSongId      = songsWebElement[element_id-1].find_element(By.CLASS_NAME, 'VpYFchIiPg3tPhBGyynT').get_attribute('innerText')
-    lastLoadedSongTitle   = songsWebElement[element_id-1].find_element(By.CLASS_NAME, 'iCQtmPqY0QvkumAOuCjr').find_element(By.TAG_NAME, 'a').get_attribute('innerText')
-    lastLoadedSongArtist  = songsWebElement[element_id-1].find_element(By.CLASS_NAME, 'iCQtmPqY0QvkumAOuCjr').find_element(By.TAG_NAME, 'span').get_attribute('innerText')
-    print(colored( 'Scrolled To : ', 'green'), colored(f'Scraped Song: -{lastLoadedSongId}- {lastLoadedSongTitle} - {lastLoadedSongArtist}', 'yellow'))
-    return lastLoadedSongId
+def scroll_to_element(songs, element_id, browser):
+    try:
+        print(colored(f"Scrolling to index: {element_id}", 'green'))
+        ActionChains(browser).scroll_to_element(songs[element_id-1]).perform()
+        last_song = songs[element_id-1]
+        last_id = last_song.find_element(By.CSS_SELECTOR, "div[data-testid='track-row'] div[data-testid='tracklist-row__track-id']").text
+        last_title = last_song.find_element(By.CSS_SELECTOR, "div[data-testid='tracklist-row__track-info'] a").text
+        last_artist = last_song.find_element(By.CSS_SELECTOR, "div[data-testid='tracklist-row__track-info'] span:last-child").text
+        print(colored(f"Scrolled to: -{last_id}- {last_title} - {last_artist}", 'yellow'))
+        return last_id
+    except Exception as e:
+        print(colored(f"Error scrolling: {e}", "red"))
+        return None
 
-last_time_index = 0
-
-# Output to excel
 def output_to_json(data, playlist_id):
-    with open(f'playlist-{playlist_id}.json', 'w', encoding='UTF8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-    print(colored("Outputted to JSON file Successfully","red"))
+    try:
+        with open(f'playlist-{playlist_id}.json', 'w', encoding='UTF8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        print(colored("Outputted to JSON file Successfully", "red"))
+    except Exception as e:
+        print(colored(f"Error saving JSON: {e}", "red"))
 
-
-def getPlaylistDataFromSpotify(playlist_id : str):
+def getPlaylistDataFromSpotify(playlist_id: str):
     playlist_url = f'https://open.spotify.com/playlist/{playlist_id}'
-    #Chrome Driver loading ...
     chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    browser = webdriver.Chrome(executable_path=f'chromedriver.exe' ,chrome_options=chrome_options)
+    service = Service(ChromeDriverManager().install())
+    browser = webdriver.Chrome(service=service, options=chrome_options)
     browser.maximize_window()
 
-    browser.get(playlist_url)
-    data = []
+    try:
+        browser.get(playlist_url)
+        print("Waiting for playlist to load...")
+        WebDriverWait(browser, 15).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='tracklist-row']"))
+        )
+        data = []
+        last_time_index = None
+        while True:
+            songs = browser.find_elements(By.CSS_SELECTOR, "div[data-testid='tracklist-row']")
+            for song in songs:
+                scrape_song(song, data)
+            if not songs:
+                print(colored("No songs found.", "red"))
+                break
+            new_last_id = scroll_to_element(songs, len(songs), browser)
+            if new_last_id == last_time_index:
+                break
+            last_time_index = new_last_id
+            time.sleep(1)  # Brief pause to allow new content to load
+        output_to_json(data, playlist_id)
+    except Exception as e:
+        print(colored(f"Error in scraping playlist: {e}", "red"))
+    finally:
+        browser.quit()
 
-
-    print('Waiting for contentSpacing div that contains the songs to load ')
-    time.sleep(10)
-    print('10 seconds passed, Lets risk that its okay and loaded')
-
-    Ks = browser.find_elements(By.CLASS_NAME, "JUa6JJNj7R_Y3i4P8YUX")[0] #browser.find_elements(By.CLASS_NAME, "contentSpacing")
-    last_song_name = ""
-    while True:
-        #get_availble_songs on the first check
-        songsContainer = Ks.find_elements(By.CLASS_NAME, 'h4HgbO_Uu1JYg5UGANeQ')
-        # Scrape from 0 to len(songs)
-        for songRow in songsContainer:
-            scrape_song(songRow,data)
-        
-        global last_time_index
-
-        this_lastLoadedSongId = scroll_to_element(songsContainer, len(songsContainer), browser)
-        if last_time_index == this_lastLoadedSongId:
-            break
-        last_time_index = this_lastLoadedSongId
-
-        time.sleep(5)
-    output_to_json(data, playlist_id)
+if __name__ == "__main__":
+    playlist_id = input("Enter Spotify playlist ID: ")
+    getPlaylistDataFromSpotify(playlist_id)
